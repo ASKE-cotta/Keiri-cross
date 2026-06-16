@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CROSS GUILD 経理部(プロトタイプ)</title>
+<!-- GA4: eraOP/WIRETAPと同一プロパティ。file://やオフラインでは黙って失敗するだけで無害 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-3FHVR89B52"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-3FHVR89B52');
+  function track(ev, params){ try{ gtag('event', ev, params||{}); }catch(e){} }
+</script>
+<style>
+  :root{
+    --desk:#241510; --desk-edge:#1a0e0a;
+    --paper:#f2e8d2; --paper-shadow:#d8c9a8;
+    --ink:#2e2a24; --ink-faint:#6b6353;
+    --gold:#c9a24b; --gold-dim:#8a7034;
+    --vermilion:#c0392b; --indigo:#2c3e66;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    background:var(--desk-edge);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:var(--paper);display:flex;justify-content:center;overscroll-behavior:none;
+  }
+  #app{
+    width:100%;max-width:480px;height:100dvh;
+    background:radial-gradient(ellipse at 50% -10%, #3a241a 0%, var(--desk) 60%);
+    display:flex;flex-direction:column;position:relative;overflow:hidden;
+  }
+  /* ===== 上部バー ===== */
+  #topbar{
+    display:flex;justify-content:space-between;align-items:center;gap:6px;
+    padding:10px 12px;font-size:11px;letter-spacing:.04em;
+    color:var(--gold);border-bottom:1px solid rgba(201,162,75,.25);flex-shrink:0;
+  }
+  #topbar > span{white-space:nowrap;}
+  #topbar .label{color:var(--gold-dim);font-size:9px;margin-right:3px;}
+  #hudTime.warn{color:#e0837a;animation:blink 1s steps(2) infinite;}
+  @keyframes blink{50%{opacity:.4;}}
+  #btnRules{
+    background:none;border:1px solid var(--gold-dim);color:var(--gold);flex-shrink:0;
+    font-size:11px;padding:3px 10px;border-radius:4px;letter-spacing:.1em;cursor:pointer;
+  }
+  /* ===== 伝票 ===== */
+  #deskArea{flex:1;overflow-y:auto;padding:14px 14px 8px;}
+  .slip{
+    background:var(--paper);color:var(--ink);
+    font-family:"Hiragino Mincho ProN","Yu Mincho","BIZ UDMincho",serif;
+    border-radius:2px;box-shadow:0 6px 18px rgba(0,0,0,.55),0 1px 0 var(--paper-shadow) inset;
+    padding:16px 16px 20px;position:relative;animation:slipIn .35s ease-out;
+  }
+  @keyframes slipIn{from{transform:translateY(-30px) rotate(-1.5deg);opacity:0;}to{transform:none;opacity:1;}}
+  .slip-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:10px;}
+  .slip-header h2{font-size:16px;letter-spacing:.3em;}
+  .slip-header .slip-no{font-size:11px;color:var(--ink-faint);}
+  .field{padding:7px 8px;border-bottom:1px dotted #b9ab8a;display:flex;justify-content:space-between;align-items:center;font-size:13px;position:relative;cursor:pointer;}
+  .field .k{color:var(--ink-faint);font-size:11px;min-width:4.5em;}
+  .field .v{flex:1;text-align:right;}
+  .field.flagged{background:rgba(192,57,43,.12);}
+  .field.flagged::after{content:"⚑";position:absolute;left:-4px;top:-6px;color:var(--vermilion);font-size:15px;transform:rotate(-12deg);}
+  .breakdown .field{padding-left:20px;}
+  .total-row{font-weight:bold;border-bottom:double 3px var(--ink);}
+  .seal-row .v{display:flex;justify-content:flex-end;}
+  .seal{
+    width:34px;height:34px;border:2px solid var(--vermilion);border-radius:50%;
+    color:var(--vermilion);display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:bold;transform:rotate(-6deg);opacity:.85;
+    writing-mode:vertical-rl;line-height:1;
+  }
+  .seal.rot{transform:rotate(174deg);}
+  .seal.sq{border-radius:4px;transform:rotate(2deg);}
+  .no-seal{font-size:11px;color:var(--ink-faint);}
+  .note-row{align-items:flex-start;}
+  .note-row .v{text-align:left;font-size:12px;line-height:1.6;padding-left:10px;}
+  .stamp-mark{
+    position:absolute;right:18px;bottom:14px;pointer-events:none;
+    font-size:26px;font-weight:bold;letter-spacing:.15em;
+    padding:8px 14px;border:3px solid;border-radius:4px;transform:rotate(-10deg) scale(2.2);opacity:0;
+  }
+  .stamp-mark.show{animation:stampIn .28s cubic-bezier(.2,1.6,.4,1) forwards;}
+  @keyframes stampIn{
+    0%{opacity:0;transform:rotate(-10deg) scale(2.4);}
+    60%{opacity:.95;transform:rotate(-10deg) scale(.92);}
+    100%{opacity:.85;transform:rotate(-10deg) scale(1);}
+  }
+  .stamp-mark.approve{color:var(--vermilion);border-color:var(--vermilion);text-shadow:0 0 1px var(--vermilion);}
+  .stamp-mark.reject{color:var(--indigo);border-color:var(--indigo);text-shadow:0 0 1px var(--indigo);}
+  /* 判定後、伝票が処理トレイへ滑り出る */
+  .slip.eject-approve{animation:ejectR .4s ease-in forwards;}
+  .slip.eject-reject{animation:ejectL .4s ease-in forwards;}
+  @keyframes ejectR{to{transform:translateX(120%) rotate(8deg);opacity:0;}}
+  @keyframes ejectL{to{transform:translateX(-120%) rotate(-8deg);opacity:0;}}
+  /* 押印時、画面が一瞬沈む */
+  #app.thud{animation:thud .12s ease-out;}
+  @keyframes thud{50%{transform:translateY(2px);}}
+  /* ダズ登場(画面端から影が差す) */
+  #dazAlert{
+    position:absolute;inset:0;z-index:18;pointer-events:none;opacity:0;
+    background:linear-gradient(90deg, rgba(10,5,3,.85) 0%, rgba(10,5,3,.4) 35%, transparent 60%);
+    display:flex;align-items:center;padding-left:8%;
+  }
+  #dazAlert.show{animation:dazIn 2.2s ease-in-out forwards;}
+  @keyframes dazIn{0%{opacity:0;}20%{opacity:1;}80%{opacity:1;}100%{opacity:0;}}
+  #dazAlert .daz-line{
+    color:var(--paper);font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    font-size:15px;letter-spacing:.2em;line-height:2;border-left:3px solid var(--vermilion);padding-left:14px;
+    text-shadow:0 2px 6px #000;
+  }
+  #dazAlert .daz-name{font-size:11px;color:var(--gold-dim);letter-spacing:.3em;margin-bottom:4px;}
+  /* ===== 下部 ===== */
+  #controls{flex-shrink:0;padding:10px 14px calc(14px + env(safe-area-inset-bottom));}
+  #hint{font-size:11px;color:rgba(242,232,210,.55);text-align:center;margin-bottom:8px;min-height:14px;}
+  #stampRow{display:flex;gap:12px;}
+  .stamp-btn{
+    flex:1;padding:16px 0;font-size:17px;font-weight:bold;letter-spacing:.25em;
+    border-radius:8px;border:none;cursor:pointer;
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;transition:transform .08s;
+  }
+  .stamp-btn:active{transform:scale(.94);}
+  #btnReject{background:var(--indigo);color:#e8ecf5;box-shadow:0 4px 0 #1c2a47;}
+  #btnApprove{background:var(--vermilion);color:#fdf0ec;box-shadow:0 4px 0 #8c2418;}
+  .stamp-btn:disabled{opacity:.35;box-shadow:none;}
+  /* ===== オーバーレイ ===== */
+  .overlay{position:absolute;inset:0;background:rgba(10,5,3,.82);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:24px;z-index:20;}
+  .hidden{display:none !important;}
+  .card{
+    background:var(--paper);color:var(--ink);width:100%;max-width:360px;border-radius:3px;
+    padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.6);
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    max-height:84dvh;overflow-y:auto;
+  }
+  .card h3{letter-spacing:.2em;font-size:15px;border-bottom:2px solid var(--ink);padding-bottom:8px;margin-bottom:12px;}
+  .card p{font-size:13px;line-height:1.9;white-space:pre-line;}
+  .card .speaker{font-size:11px;color:var(--ink-faint);margin-bottom:4px;}
+  .btn-main{display:block;width:100%;margin-top:18px;padding:13px;font-size:14px;letter-spacing:.2em;background:var(--ink);color:var(--paper);border:none;border-radius:6px;cursor:pointer;}
+  .btn-sub{display:block;width:100%;margin-top:10px;padding:11px;font-size:12px;letter-spacing:.15em;background:none;color:var(--ink-faint);border:1px solid #b9ab8a;border-radius:6px;cursor:pointer;}
+  #violationCard{border-top:6px solid var(--vermilion);}
+  #violationCard h3{color:var(--vermilion);border-color:var(--vermilion);}
+  #resultFlash{
+    position:absolute;top:38%;left:0;right:0;text-align:center;z-index:15;pointer-events:none;
+    font-size:22px;font-weight:bold;letter-spacing:.3em;opacity:0;text-shadow:0 2px 8px rgba(0,0,0,.8);
+  }
+  #resultFlash.show{animation:flash 1s ease-out forwards;}
+  @keyframes flash{0%{opacity:0;transform:scale(.8);}15%{opacity:1;transform:scale(1.05);}30%{transform:scale(1);}75%{opacity:1;}100%{opacity:0;}}
+  #resultFlash.good{color:#7fc98a;}
+  #resultFlash.bad{color:#e0837a;}
+  /* 規定書 */
+  #rulesCard ol{padding-left:1.5em;}
+  #rulesCard li{font-size:13px;line-height:1.9;margin-bottom:6px;}
+  #rulesCard .today{font-size:12px;color:var(--ink-faint);margin-bottom:10px;}
+  /* タイトル */
+  #titleScreen{justify-content:center;background:var(--desk-edge);}
+  #titleScreen .logo{font-family:"Hiragino Mincho ProN","Yu Mincho",serif;text-align:center;color:var(--gold);letter-spacing:.35em;}
+  #titleScreen .logo .en{font-size:13px;color:var(--gold-dim);letter-spacing:.5em;margin-bottom:8px;}
+  #titleScreen .logo h1{font-size:30px;font-weight:600;}
+  #titleScreen .logo .sub{font-size:11px;color:rgba(242,232,210,.5);margin-top:12px;letter-spacing:.2em;}
+  #titleScreen .menu{margin-top:48px;width:250px;}
+  #titleScreen .menu .btn-sub{color:rgba(242,232,210,.55);border-color:rgba(242,232,210,.25);}
+  #titleScreen .proto{position:absolute;bottom:18px;font-size:10px;color:rgba(242,232,210,.3);letter-spacing:.15em;}
+  #btnEdit{
+    position:absolute;bottom:40px;background:none;border:1px solid rgba(242,232,210,.2);
+    color:rgba(242,232,210,.4);font-size:10px;letter-spacing:.3em;padding:5px 16px;border-radius:4px;cursor:pointer;
+  }
+  #editDayGrid button{
+    padding:14px 0;font-size:15px;font-weight:bold;background:var(--ink);color:var(--paper);
+    border:none;border-radius:6px;cursor:pointer;font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+  }
+  #editDayGrid button:active{transform:scale(.94);}
+  /* 日報 */
+  .report-line{display:flex;justify-content:space-between;font-size:13px;padding:7px 2px;border-bottom:1px dotted #b9ab8a;}
+  .report-line.total{font-weight:bold;border-bottom:double 3px var(--ink);font-size:15px;}
+  .rank-seal{
+    margin:16px auto 0;width:72px;height:72px;border:3px solid var(--vermilion);border-radius:50%;
+    color:var(--vermilion);display:flex;align-items:center;justify-content:center;
+    font-size:22px;font-weight:bold;transform:rotate(-8deg);
+  }
+  .rank-seal.big{width:96px;height:96px;font-size:18px;text-align:center;line-height:1.3;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- タイトル -->
+  <div id="titleScreen" class="overlay">
+    <div class="logo">
+      <div class="en">CROSS GUILD</div>
+      <h1>経理部</h1>
+      <div class="sub">― 送金伝票検査課 ―</div>
+    </div>
+    <div class="menu">
+      <button class="btn-main" id="btnStart">出勤する</button>
+      <button class="btn-sub hidden" id="btnReset">記録を破棄して最初から</button>
+    </div>
+    <button id="btnEdit">EDIT</button>
+    <div class="proto">PROTOTYPE BUILD — STEP 4 / DAY 1〜7</div>
+  </div>
+
+  <!-- Editモード: パスワード+Day選択 -->
+  <div id="editOverlay" class="overlay hidden">
+    <div class="card">
+      <h3>EDIT MODE</h3>
+      <div id="editPwBlock">
+        <p style="font-size:12px;margin-bottom:10px;">パスワードを入力</p>
+        <input id="editPw" type="tel" inputmode="numeric" maxlength="8" placeholder="****"
+          style="width:100%;padding:12px;font-size:18px;letter-spacing:.5em;text-align:center;border:1px solid #b9ab8a;border-radius:6px;background:#fff;color:var(--ink);font-family:monospace;">
+        <p id="editPwErr" style="font-size:11px;color:var(--vermilion);min-height:14px;margin-top:6px;"></p>
+        <button class="btn-main" id="btnEditAuth">認証</button>
+      </div>
+      <div id="editDayBlock" class="hidden">
+        <p style="font-size:12px;margin-bottom:10px;">開始するDayを選択</p>
+        <div id="editDayGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+      </div>
+      <button class="btn-sub" id="btnEditClose">閉じる</button>
+    </div>
+  </div>
+
+  <!-- 会話 -->
+  <div id="dialogOverlay" class="overlay hidden">
+    <div class="card">
+      <div class="speaker" id="dlgSpeaker"></div>
+      <p id="dlgText"></p>
+      <button class="btn-main" id="btnDlgNext">▼</button>
+    </div>
+  </div>
+
+  <!-- 規定書 -->
+  <div id="rulesOverlay" class="overlay hidden">
+    <div class="card" id="rulesCard">
+      <h3>検査規定</h3>
+      <div class="today" id="rulesToday"></div>
+      <ol id="rulesList"></ol>
+      <div id="approverTable" class="hidden"></div>
+      <p style="font-size:11px;color:var(--ink-faint);margin-top:10px;">※規定確認中も業務時間は経過する</p>
+      <button class="btn-main" id="btnRulesClose">業務に戻る</button>
+    </div>
+  </div>
+
+  <!-- 違反通知書 -->
+  <div id="violationOverlay" class="overlay hidden">
+    <div class="card" id="violationCard">
+      <h3>違反通知書</h3>
+      <p id="violationText"></p>
+      <p style="text-align:right;font-size:11px;color:var(--ink-faint);margin-top:14px;">経理部長 ギャルディーノ</p>
+      <button class="btn-main" id="btnViolationClose">次の伝票へ</button>
+    </div>
+  </div>
+
+  <!-- 日報 -->
+  <div id="reportOverlay" class="overlay hidden">
+    <div class="card">
+      <h3 id="reportTitle">業務日報</h3>
+      <div id="reportBody"></div>
+      <div class="rank-seal" id="rankSeal">可</div>
+      <button class="btn-main" id="btnIssueCard">人事考課票を発行する</button>
+      <button class="btn-sub" id="btnReportClose">退勤する(保存)</button>
+    </div>
+  </div>
+
+  <!-- 最終査定(Day7後) -->
+  <div id="finalOverlay" class="overlay hidden">
+    <div class="card">
+      <h3>最 終 査 定</h3>
+      <div id="finalBody"></div>
+      <div class="rank-seal big" id="finalRank"></div>
+      <div class="speaker" style="margin-top:18px;">クロコダイル</div>
+      <p id="finalWord"></p>
+      <button class="btn-main" id="btnFinalClose">退勤する</button>
+    </div>
+  </div>
+
+  <!-- 考課票プレビュー -->
+  <div id="cardOverlay" class="overlay hidden">
+    <div style="width:100%;max-width:340px;">
+      <canvas id="kokaCanvas" width="1080" height="1350"
+        style="width:100%;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.7);"></canvas>
+      <button class="btn-main" id="btnShareCard" style="background:var(--vermilion);">考課票をシェアする</button>
+      <button class="btn-sub" id="btnSaveCard" style="color:var(--paper);border-color:rgba(242,232,210,.4);">画像を保存</button>
+      <button class="btn-sub" id="btnCardClose" style="color:rgba(242,232,210,.6);border-color:rgba(242,232,210,.25);">閉じる</button>
+    </div>
+  </div>
+
+  <!-- 本体 -->
+  <div id="topbar">
+    <span><span class="label">DAY</span><span id="hudDay">1</span></span>
+    <span><span class="label">残り</span><span id="hudTime">2:00</span></span>
+    <span><span class="label">伝票</span><span id="hudCount">-</span></span>
+    <span><span class="label">本日</span><span id="hudToday">-</span></span>
+    <button id="btnRules">規定</button>
+  </div>
+  <div id="deskArea"></div>
+  <div id="resultFlash"></div>
+  <div id="dazAlert">
+    <div>
+      <div class="daz-name">― DAZ BONES ―</div>
+      <div class="daz-line" id="dazLine"></div>
+    </div>
+  </div>
+  <div id="controls">
+    <div id="hint">不備の欄をタップして付箋(複数可)、スタンプを押せ</div>
+    <div id="stampRow">
+      <button class="stamp-btn" id="btnReject">差 戻</button>
+      <button class="stamp-btn" id="btnApprove">承 認</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   検査規定(累積)
+========================================================= */
+const RULES = [
+  "内訳の合計と請求額が一致していること",
+  "印影は申請者名の頭文字で、正立していること",
+  "申請日が本日から25日前までの範囲内にあること(未来・実在しない日付・年号違いはすべて不可)",
+  "伝票には所属に応じた承認者の印影(角印)が必要。座長関連グッズ(像・肖像・記念品等)は座長本人の承認印に限る。客分は承認印不要"
+];
+/* 承認者一覧(規定書に掲載) */
+const APPROVERS = [
+  ["本部","クロコダイル(ク)"],
+  ["第2部隊・第3部隊・武具整備班・機関班・修繕班","ダズ(ダ)"],
+  ["経理部・総務部・炊事班・清掃班・医薬班・新規・外部","ギャルディーノ(ギ)"],
+  ["座長関連グッズ類(所属を問わず)","座長本人(バ)"],
+  ["客分","承認印不要"]
+];
+
+/* =========================================================
+   伝票データ DAY1〜7
+   errors: calc / seal / date / item
+   errorFields: 付箋ボーナス対象(data-f名)
+========================================================= */
+/* BEGIN DATA */
+const DAYS = {
+1:{
+ date:"海円暦1541年 6月12日", ruleCount:1,
+ intro:[
+  ["経理部長 ギャルディーノ","新入りだガネ? 私が経理部長のギャルディーノだガネ。本日からお前には送金伝票の検査を担当してもらうガネ。"],
+  ["経理部長 ギャルディーノ","仕事は単純ガネ。内訳の合計と請求額が合っているかを確認するガネ。"],
+  ["経理部長 ギャルディーノ","合っていれば「承認」、合っていなければ不備の欄に付箋を貼って「差戻」だガネ。規定は右上の「規定」からいつでも確認できるガネ。"],
+  ["経理部長 ギャルディーノ","業務時間は終業の鐘まで。この組織の数字は'あの方'が見ているガネ。頼んだガネ!!"]
+ ],
+ slips:[
+  {no:"D01-001",type:"送金伝票",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 6月10日",
+   items:[["刀剣 砥ぎ直し 20本",200000],["銃器 部品交換",150000]],total:350000,sealText:"ガ",
+   note:"前線部隊分。至急お願いします。",errors:[],errorFields:[]},
+  {no:"D01-002",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月10日",
+   items:[["大宴会 酒類一式",800000],["花火・火薬",500000],["壊れた椅子の弁償",50000]],total:1450000,sealText:"バ",
+   note:"景気づけだ!! 文句あるか!!",errors:["calc"],errorFields:["total"]},
+  {no:"D01-003",type:"経費精算",applicant:"ギャルディーノ",dept:"経理部",date:"海円暦1541年 6月11日",
+   items:[["事務用インク・帳簿",60000],["最高級茶葉(業務上必要)",90000],["ティーセット(来客対応用)",120000]],total:270000,sealText:"ギ",
+   note:"すべて業務に不可欠な品である。",errors:[],errorFields:[]},
+  {no:"D01-004",type:"送金伝票",applicant:"リッチー係",dept:"猛獣管理班",date:"海円暦1541年 6月11日",
+   items:[["飼育用 生肉",300000],["毛づくろい用品",45000]],total:345000,sealText:"リ",
+   note:"リッチーは今日も元気です。",errors:[],errorFields:[]},
+  {no:"D01-005",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月11日",
+   items:[["バギー様黄金像 台座補強",700000],["記念銘板 彫刻",250000]],total:1050000,sealText:"モ",
+   note:"座長の威光を後世に!!",errors:["calc"],errorFields:["total"]},
+  {no:"D01-006",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月12日",
+   items:[["食材(米・肉・野菜)",420000],["調味料",60000],["鍋 買い替え",80000]],total:620000,sealText:"ド",
+   note:"鍋は宴会で吹き飛びました。",errors:["calc"],errorFields:["total"]},
+  {no:"D01-007",type:"送金伝票",applicant:"ロロ",dept:"総務部",date:"海円暦1541年 6月12日",
+   items:[["帆布 補修用",180000],["ロープ 一巻",70000]],total:250000,sealText:"ロ",
+   note:"倉庫の在庫が切れました。",errors:[],errorFields:[]}
+ ]},
+2:{
+ date:"海円暦1541年 6月13日", ruleCount:2,
+ intro:[
+  ["経理部長 ギャルディーノ","今日から印影の照合も追加だガネ。印は申請者名の頭文字で、正立しているのが規定ガネ。"],
+  ["経理部長 ギャルディーノ","違う文字の印、逆さまの印は差戻ガネ。偽造かもしれないガネ…!!"]
+ ],
+ slips:[
+  {no:"D02-001",type:"経費精算",applicant:"サニ",dept:"清掃班",date:"海円暦1541年 6月12日",
+   items:[["モップ・洗剤",35000],["バケツ 5個",15000]],total:50000,sealText:"サ",
+   note:"宴会後の清掃は地獄です。",errors:[],errorFields:[]},
+  {no:"D02-002",type:"送金伝票",applicant:"カバジ部隊有志",dept:"第2部隊",date:"海円暦1541年 6月12日",
+   items:[["一輪車 整備",120000],["曲刀 研磨",80000]],total:200000,sealText:"サ",
+   note:"曲芸は武器だ。",errors:["seal"],errorFields:["seal"]},
+  {no:"D02-003",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月13日",
+   items:[["特選花火 大玉",600000],["火薬 補充",200000]],total:800000,sealText:"バ",
+   note:"派手にいくぞ!!",errors:[],errorFields:[]},
+  {no:"D02-004",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月13日",
+   items:[["バギー様黄金像 全身鍍金",1200000],["専用磨き布",400000]],total:1800000,sealText:"モ",
+   note:"輝け!! 我らが座長!!",errors:["calc"],errorFields:["total"]},
+  {no:"D02-005",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月13日",
+   items:[["食器 補充",90000],["布巾 まとめ買い",30000]],total:120000,sealText:"ド",sealRot:true,
+   note:"急いでいたので印が…すみません。",errors:["seal"],errorFields:["seal"]},
+  {no:"D02-006",type:"送金伝票",applicant:"ミナ",dept:"医薬班",date:"海円暦1541年 6月13日",
+   items:[["包帯・消毒液",250000],["解熱薬",100000]],total:350000,sealText:"ミ",
+   note:"宴会明けの患者が多すぎます。",errors:[],errorFields:[]},
+  {no:"D02-007",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月13日",
+   items:[["宴会 酒類(二夜連続)",950000],["肉 大量",350000]],total:1400000,sealText:"バ",
+   note:"昨日の続きだ!! 細かいことを言うな!!",errors:["calc"],errorFields:["total"]},
+  {no:"D02-008",type:"送金伝票",applicant:"ロロ",dept:"総務部",date:"海円暦1541年 6月13日",
+   items:[["港湾使用料(月額)",500000]],total:500000,sealText:"ロ",
+   note:"期日厳守でお願いします。",errors:[],errorFields:[]}
+ ]},
+3:{
+ date:"海円暦1541年 6月14日", ruleCount:3,
+ intro:[
+  ["経理部長 ギャルディーノ","今日から日付も見るガネ。本日より未来の日付や、実在しない日付は差戻だガネ。"],
+  ["経理部長 ギャルディーノ","本日の日付は画面上に出ているガネ。有効なのは本日から25日前までガネ。それより古い伝票は期限切れで差戻だガネ。"],
+  ["経理部長 ギャルディーノ","未来の日付、実在しない日、年号違いも当然ダメガネ。月をまたぐと日数の計算が要るガネ…暦も読めん阿呆が多すぎるガネ!!"]
+ ],
+ slips:[
+  {no:"D03-001",type:"経費精算",applicant:"ミホーク",dept:"客分",date:"海円暦1541年 6月13日",
+   items:[["植物",300000]],total:300000,sealText:"ミ",
+   note:"植物。",errors:[],errorFields:[]},
+  {no:"D03-002",type:"送金伝票",applicant:"ナジ",dept:"機関班",date:"海円暦1541年 6月20日",
+   items:[["燃料 重油",240000]],total:240000,sealText:"ナ",
+   note:"早めに申請しておきます。",errors:["date"],errorFields:["date"]},
+  {no:"D03-003",type:"経費精算",applicant:"ガレット",dept:"武具整備班",date:"海円暦1540年 6月14日",
+   items:[["砥石 上物",60000]],total:60000,sealText:"ガ",
+   note:"いい石が入りました。",errors:["date"],errorFields:["date"]},
+  {no:"D03-004",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月14日",
+   items:[["座長記念メダル 鋳造",300000],["贈呈用リボン",150000]],total:540000,sealText:"モ",
+   note:"全構成員に配布予定!!",errors:["calc"],errorFields:["total"]},
+  {no:"D03-005",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月31日",
+   items:[["食材 まとめ買い",380000],["料理用酒",120000]],total:500000,sealText:"ド",
+   note:"月末にまとめて処理してください。",errors:["date"],errorFields:["date"]},
+  {no:"D03-006",type:"経費精算",applicant:"ギャルディーノ",dept:"経理部",date:"海円暦1541年 6月14日",
+   items:[["茶菓子(来客対応用)",45000]],total:45000,sealText:"ギ",
+   note:"来客対応に必要不可欠である。",errors:[],errorFields:[]},
+  {no:"D03-007",type:"送金伝票",applicant:"リッチー係",dept:"猛獣管理班",date:"海円暦1541年 6月14日",
+   items:[["飼育用 生肉",320000]],total:320000,sealText:"モ",
+   note:"係が不在のため、モージ様が代わりに押印しました。",errors:["seal"],errorFields:["seal"]},
+  {no:"D03-008",type:"送金伝票",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月14日",
+   items:[["講堂 屋根修繕",700000],["足場 組立",300000]],total:1000000,sealText:"バ",
+   note:"花火は屋内では使わないと約束する!!",errors:[],errorFields:[]},
+  {no:"D03-009",type:"送金伝票",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 6月14日",
+   items:[["弾薬 補充",280000],["火縄 一式",190000]],total:520000,sealText:"ガ",
+   note:"訓練で使い切りました。",errors:["calc"],errorFields:["total"]},
+  {no:"D03-010",type:"送金伝票",applicant:"ザザ",dept:"見張り番",date:"海円暦1541年 5月20日",
+   items:[["望遠鏡 修理",90000],["双眼鏡 新調",60000]],total:150000,sealText:"ザ",
+   note:"先月の請求が今頃回ってきました。",errors:[],errorFields:[]},
+  {no:"D03-011",type:"経費精算",applicant:"ゴリ",dept:"操舵班",date:"海円暦1541年 5月19日",
+   items:[["舵輪 部品",120000]],total:120000,sealText:"ゴ",
+   note:"だいぶ前の分ですが…",errors:["date"],errorFields:["date"]}
+ ]},
+4:{
+ date:"海円暦1541年 6月15日", ruleCount:4,
+ intro:[
+  ["経理部長 ギャルディーノ","通達ガネ。本日から全伝票に承認印(角印)が必要になったガネ。所属ごとの承認者は規定書に載せたガネ。"],
+  ["経理部長 ギャルディーノ","特に!! 座長関連グッズ類は座長本人の承認印がなければ却下ガネ。…像が、増えすぎたガネ。"]
+ ],
+ slips:[
+  {no:"D04-001",type:"経費精算",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月15日",
+   items:[["バギー様黄金像 クリーニング",200000]],total:200000,sealText:"モ",approver:"モ",
+   note:"輝きを保つのは我らの使命!! モージ様の承認も頂いた!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D04-002",type:"送金伝票",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 6月15日",
+   items:[["刀剣 新調 10本",540000]],total:540000,sealText:"ガ",approver:"ダ",
+   note:"古い物は限界です。",errors:[],errorFields:[]},
+  {no:"D04-003",type:"経費精算",applicant:"ボンド",dept:"総務部",date:"海円暦1541年 6月15日",
+   items:[["文書複写 費用",150000]],total:150000,sealText:"ホ",approver:"ギ",
+   note:"資料整理のため。",errors:["seal"],errorFields:["seal"]},
+  {no:"D04-004",type:"経費精算",applicant:"ミホーク",dept:"客分",date:"海円暦1541年 6月14日",
+   items:[["ワイン(来客接待用)",450000]],total:450000,sealText:"ミ",approver:null,
+   note:"接待に使うとは言っていない。",errors:[],errorFields:[]},
+  {no:"D04-005",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月15日",
+   items:[["座長肖像画 大判印刷 100枚",350000]],total:350000,sealText:"モ",approver:null,
+   note:"各居室に一枚ずつ!! 承認?座長は照れるから内緒です!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D04-006",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月15日",
+   items:[["食材",410000],["薪",40000]],total:450000,sealText:"ド",approver:"ギ",
+   note:"平和な一日でありますように。",errors:[],errorFields:[]},
+  {no:"D04-007",type:"送金伝票",applicant:"トト",dept:"修繕班",date:"海円暦1541年 6月22日",
+   items:[["ペンキ 各色",130000],["刷毛 一式",20000]],total:150000,sealText:"ト",approver:"ダ",
+   note:"来週やる予定なので。",errors:["date"],errorFields:["date"]},
+  {no:"D04-008",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月15日",
+   items:[["樽酒 特上",880000],["余興 手配費",220000]],total:1210000,sealText:"バ",approver:"ク",
+   note:"良い知らせがあったんだ!! 飲むぞ!!",errors:["calc"],errorFields:["total"]},
+  {no:"D04-009",type:"入会金",applicant:"ジン",dept:"新規",date:"海円暦1541年 6月15日",
+   items:[["装備 支給",80000],["登録料",20000]],total:100000,sealText:"ジ",approver:"ギ",
+   note:"よろしくお願いします。",errors:[],errorFields:[]},
+  {no:"D04-010",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月15日",
+   items:[["座長記念メダル 鋳造",260000]],total:260000,sealText:"モ",approver:"バ",
+   note:"座長が大変ノリノリで押印された。",errors:[],errorFields:[]},
+  {no:"D04-011",type:"送金伝票",applicant:"ペペ",dept:"操舵班",date:"海円暦1541年 5月21日",
+   items:[["羅針盤 交換",180000]],total:180000,sealText:"ペ",approver:"ダ",
+   note:"5月分の繰り越しです。",errors:[],errorFields:[]},
+  {no:"D04-012",type:"経費精算",applicant:"ドドリ",dept:"操舵班",date:"海円暦1541年 5月18日",
+   items:[["海図 補充",75000]],total:75000,sealText:"ド",approver:"ダ",
+   note:"ずっと机に埋もれていました…",errors:["date"],errorFields:["date"]}
+ ]},
+5:{
+ date:"海円暦1541年 6月16日", ruleCount:4,
+ intro:[
+  ["経理部長 ギャルディーノ","大変ガネ!! 各地の信者から献金が殺到しているガネ!!"],
+  ["経理部長 ギャルディーノ","受領伝票も検査対象ガネ。浮かれて雑な書類を出す奴が増えるガネ。気を引き締めるガネ!!"]
+ ],
+ slips:[
+  {no:"D05-001",type:"献金受領",applicant:"バギー親衛隊 東の海支部",dept:"外部",date:"海円暦1541年 6月15日",
+   items:[["献金",5000000]],total:5000000,sealText:"バ",approver:"ギ",
+   note:"座長の益々のご活躍を!!",errors:[],errorFields:[]},
+  {no:"D05-002",type:"献金受領",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月15日",
+   items:[["金貨",3000000],["宝石類",1500000]],total:4950000,sealText:"信",approver:"ギ",
+   note:"心ばかりの品です!!",errors:["calc"],errorFields:["total"]},
+  {no:"D05-003",type:"経費精算",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月16日",
+   items:[["御礼用 座長ブロマイド 増刷",120000]],total:120000,sealText:"信",approver:"ギ",
+   note:"献金の御礼に配ります!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D05-004",type:"献金受領",applicant:"信者会 西の海支部",dept:"外部",date:"海円暦1541年 6月15日",
+   items:[["献金",2800000]],total:2800000,sealText:"東",approver:"ギ",
+   note:"西の海より愛を込めて。",errors:["seal"],errorFields:["seal"]},
+  {no:"D05-005",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月16日",
+   items:[["祝宴 酒類",600000],["祝宴 料理",250000]],total:850000,sealText:"バ",approver:"ク",
+   note:"献金万歳!! 太っ腹でいくぞ!!",errors:[],errorFields:[]},
+  {no:"D05-006",type:"献金受領",applicant:"信者会 南の海支部",dept:"外部",date:"海円暦1541年 6月30日",
+   items:[["献金(予定)",2000000]],total:2000000,sealText:"信",approver:"ギ",
+   note:"月末に必ず払います!!",errors:["date"],errorFields:["date"]},
+  {no:"D05-007",type:"送金伝票",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月16日",
+   items:[["祝賀横断幕 縫製",180000],["染料",70000]],total:290000,sealText:"有",approver:"ギ",
+   note:"港に掲げます!!",errors:["calc","seal"],errorFields:["total","seal"]},
+  {no:"D05-008",type:"送金伝票",applicant:"ロロ",dept:"総務部",date:"海円暦1541年 6月16日",
+   items:[["荷揚げ 人足賃",320000],["雑費",80000]],total:400000,sealText:"ロ",approver:"ギ",
+   note:"献金の荷が多すぎます…",errors:[],errorFields:[]},
+  {no:"D05-009",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月16日",
+   items:[["バギー様黄金像 第2号 建立費",2400000],["第2号 台座",800000]],total:3200000,sealText:"モ",approver:"モ",
+   note:"献金があるなら像を建てるべき!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D05-010",type:"経費精算",applicant:"ミホーク",dept:"客分",date:"海円暦1541年 6月16日",
+   items:[["苗木",280000]],total:280000,sealText:"ミ",approver:null,
+   note:"植物。",errors:[],errorFields:[]},
+  {no:"D05-011",type:"献金受領",applicant:"信者会 北の海支部",dept:"外部",date:"海円暦1541年 5月22日",
+   items:[["献金",1800000]],total:1800000,sealText:"信",approver:"ギ",
+   note:"郵送に時間がかかりました!!",errors:[],errorFields:[]},
+  {no:"D05-012",type:"献金受領",applicant:"信者会 旧支部",dept:"外部",date:"海円暦1541年 5月20日",
+   items:[["献金",900000]],total:900000,sealText:"信",approver:"ギ",
+   note:"解散した支部からの積立金です。",errors:["date"],errorFields:["date"]}
+ ]},
+6:{
+ date:"海円暦1541年 6月17日", ruleCount:4,
+ intro:[
+  ["経理部長 ギャルディーノ","今日は量が多いガネ!! 昨日の献金騒ぎの後始末ガネ!!"],
+  ["経理部長 ギャルディーノ","スピードと正確さ、両方だガネ。明日は…いや、何でもないガネ。集中するガネ!!"]
+ ],
+ slips:[
+  {no:"D06-001",type:"送金伝票",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 6月17日",
+   items:[["刀剣 整備",200000],["銃器 整備",150000],["砲弾 補充",90000]],total:440000,sealText:"ガ",approver:"ダ",
+   note:"通常整備です。",errors:[],errorFields:[]},
+  {no:"D06-002",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月17日",
+   items:[["食材",300000],["香辛料",160000]],total:510000,sealText:"ド",approver:"ギ",
+   note:"祝宴の補充です。",errors:["calc"],errorFields:["total"]},
+  {no:"D06-003",type:"経費精算",applicant:"ロロ",dept:"総務部",date:"海円暦1541年 6月17日",
+   items:[["帳簿用紙",110000]],total:110000,sealText:"ロ",sealRot:true,approver:"ギ",
+   note:"急ぎです。",errors:["seal"],errorFields:["seal"]},
+  {no:"D06-004",type:"送金伝票",applicant:"ナジ",dept:"機関班",date:"海円暦1541年 6月19日",
+   items:[["燃料 重油",300000]],total:300000,sealText:"ナ",approver:"ダ",
+   note:"また早めに出しておきます。",errors:["date"],errorFields:["date"]},
+  {no:"D06-005",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月17日",
+   items:[["夏祭り用 特大花火",900000],["打揚げ 設備",300000]],total:1200000,sealText:"バ",approver:"ク",
+   note:"夏は先取りだ!!",errors:[],errorFields:[]},
+  {no:"D06-006",type:"送金伝票",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月17日",
+   items:[["座長柄ハッピ 200着",600000]],total:600000,sealText:"信",approver:null,
+   note:"祭りには制服が必要!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D06-007",type:"送金伝票",applicant:"トト",dept:"修繕班",date:"海円暦1541年 6月25日",
+   items:[["木材",250000],["釘・金具",140000]],total:420000,sealText:"ト",approver:"ダ",
+   note:"先週怒られたので今度は早めに出します。",errors:["calc","date"],errorFields:["total","date"]},
+  {no:"D06-008",type:"経費精算",applicant:"ギャルディーノ",dept:"経理部",date:"海円暦1541年 6月17日",
+   items:[["高級茶器(耐熱仕様)",180000]],total:180000,sealText:"ギ",approver:"ギ",
+   note:"先日の戦闘で割れた。業務に支障が出る。承認者も私だが何か問題でも?",errors:[],errorFields:[]},
+  {no:"D06-009",type:"経費精算",applicant:"ボンド",dept:"総務部",date:"海円暦1541年 6月17日",
+   items:[["文書複写 費用",210000]],total:210000,sealText:"ホ",approver:"ギ",
+   note:"先日は失礼しました。今回は正規の申請です。",errors:["seal"],errorFields:["seal"]},
+  {no:"D06-010",type:"送金伝票",applicant:"ミナ",dept:"医薬班",date:"海円暦1542年 6月17日",
+   items:[["医薬品 補充",350000],["医療器具",150000]],total:500000,sealText:"ミ",approver:"ギ",
+   note:"祭りの前に備えます。",errors:["date"],errorFields:["date"]},
+  {no:"D06-011",type:"送金伝票",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月17日",
+   items:[["大旗 製作",320000],["旗用ポール",180000]],total:550000,sealText:"月",approver:"ギ",
+   note:"誰の印か分かりません(担当者談)。",errors:["calc","seal"],errorFields:["total","seal"]},
+  {no:"D06-012",type:"経費精算",applicant:"ミホーク",dept:"客分",date:"海円暦1541年 6月17日",
+   items:[["土",90000]],total:90000,sealText:"ミ",approver:null,
+   note:"土。",errors:[],errorFields:[]},
+  {no:"D06-013",type:"経費精算",applicant:"ゲン",dept:"炊事班",date:"海円暦1541年 5月23日",
+   items:[["保存食 仕入れ",200000],["塩 大袋",40000]],total:240000,sealText:"ゲ",approver:"ギ",
+   note:"航海前の備蓄分、計上が遅れました。",errors:[],errorFields:[]},
+  {no:"D06-014",type:"送金伝票",applicant:"テツ",dept:"機関班",date:"海円暦1541年 5月22日",
+   items:[["古い燃料代 精算",160000]],total:160000,sealText:"テ",approver:"ダ",
+   note:"前の航海の分が残っていました。",errors:["date"],errorFields:["date"]}
+ ]},
+7:{
+ date:"海円暦1541年 6月28日", ruleCount:4,
+ intro:[
+  ["経理部長 ギャルディーノ","最悪だガネ…!! よりによって月末締めの今日に、'あの方'の監査が重なったガネ…!!"],
+  ["経理部長 ギャルディーノ","駆け込みの申請が山ほど来るガネ。どいつもこいつも雑で適当ガネ。でも監査中ガネ、ミスは絶対に許されないガネ…!!"],
+  ["クロコダイル","クハハハ…ずいぶん慌ただしいな。"],
+  ["クロコダイル","構わん、いつも通りやれ。…ただし、お前の処理は一枚残らず見ている。始めろ。"]
+ ],
+ slips:[
+  {no:"D07-001",type:"送金伝票",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 6月28日",
+   items:[["刀剣 整備",300000],["銃器 整備",250000]],total:550000,sealText:"ガ",approver:"ダ",
+   note:"月末分です。急いでるんで確認よろしく!!",errors:[],errorFields:[]},
+  {no:"D07-002",type:"経費精算",applicant:"ドリス",dept:"炊事班",date:"海円暦1541年 6月28日",
+   items:[["食材 駆け込み発注",380000],["酒 追加",220000],["氷",50000]],total:660000,sealText:"ド",approver:"ギ",
+   note:"〆切今日!?聞いてない!!とりあえず出します!!",errors:["calc"],errorFields:["total"]},
+  {no:"D07-003",type:"送金伝票",applicant:"トト",dept:"修繕班",date:"海円暦1541年 6月30日",
+   items:[["壁 補修",200000],["塗装",100000]],total:300000,sealText:"ト",approver:"ダ",
+   note:"月末までにやるんで先に請求だけ!!",errors:["date"],errorFields:["date"]},
+  {no:"D07-004",type:"経費精算",applicant:"ロロ",dept:"総務部",date:"海円暦1541年 6月28日",
+   items:[["備品 まとめ買い",170000],["事務用品",80000]],total:250000,sealText:"ロ",sealRot:true,approver:"ギ",
+   note:"印押す暇もない!! とにかく通して!!",errors:["seal"],errorFields:["seal"]},
+  {no:"D07-005",type:"送金伝票",applicant:"ナジ",dept:"機関班",date:"海円暦1541年 5月31日",
+   items:[["燃料代 先月分",240000]],total:240000,sealText:"ナ",approver:"ダ",
+   note:"先月のやつ出し忘れてた!! 今ならまだ間に合うよね!?",errors:["date"],errorFields:["date"]},
+  {no:"D07-006",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月28日",
+   items:[["監査どうでもいい宴会 酒",900000],["料理",450000]],total:1350000,sealText:"バ",approver:"ク",
+   note:"監査ァ!? 知るか!! 飲むぞ!!",errors:[],errorFields:[]},
+  {no:"D07-007",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月28日",
+   items:[["黄金像 月末特別清掃",300000]],total:300000,sealText:"モ",approver:"ダ",
+   note:"監査の前に像を磨かねば!! ダズさんの印もらった!!",errors:["approve"],errorFields:["approve"]},
+  {no:"D07-008",type:"経費精算",applicant:"ミナ",dept:"医薬班",date:"海円暦1541年 6月28日",
+   items:[["胃薬 大量発注",120000],["栄養剤",80000]],total:200000,sealText:"ミ",approver:"ギ",
+   note:"経理部から大量注文が…ギャルディーノさん大丈夫ですか?",errors:[],errorFields:[]},
+  {no:"D07-009",type:"送金伝票",applicant:"信者会有志",dept:"外部",date:"海円暦1541年 6月28日",
+   items:[["月末献金 集計",2800000],["手数料",200000]],total:2950000,sealText:"有",approver:"ギ",
+   note:"月末なんで一気に送ります!! 計算合ってるはず!!",errors:["calc","seal"],errorFields:["total","seal"]},
+  {no:"D07-010",type:"経費精算",applicant:"ガレット",dept:"武具整備班",date:"海円暦1541年 7月1日",
+   items:[["来月分 火薬 前借り",330000]],total:330000,sealText:"ガ",approver:"ダ",
+   note:"どうせなら来月分も!! 締め一緒でしょ!?",errors:["date"],errorFields:["date"]},
+  {no:"D07-011",type:"経費精算",applicant:"ミホーク",dept:"客分",date:"海円暦1541年 6月28日",
+   items:[["ワイン",500000]],total:500000,sealText:"ミ",approver:null,
+   note:"騒がしいな。これだけ通して消える。",errors:[],errorFields:[]},
+  {no:"D07-012",type:"送金伝票",applicant:"ボンド",dept:"総務部",date:"海円暦1541年 6月28日",
+   items:[["文書整理 費用",90000]],total:90000,sealText:"ボ",approver:"ギ",
+   note:"どさくさに紛れて…いえ、何でもありません。",errors:[],errorFields:[]},
+  {no:"D07-013",type:"送金伝票",applicant:"モージ親衛隊有志",dept:"第3部隊",date:"海円暦1541年 6月28日",
+   items:[["バギー様黄金像 第3号 駆け込み発注",1900000],["特急料金",600000]],total:2400000,sealText:"モ",approver:"モ",
+   note:"監査でバレる前に予算確保!! 急げ!!",errors:["approve","calc"],errorFields:["approve","total"]},
+  {no:"D07-014",type:"経費精算",applicant:"バギー(座長)",dept:"本部",date:"海円暦1541年 6月28日",
+   items:[["'あの方'への 高級茶葉",180000],["菓子折り",120000]],total:300000,sealText:"バ",approver:"ク",
+   note:"監査だぞ!? ご機嫌取りは基本だろ!!",errors:[],errorFields:[]},
+  {no:"D07-015",type:"経費精算",applicant:"ギャルディーノ",dept:"経理部",date:"海円暦1541年 6月28日",
+   items:[["胃薬(追加)",90000],["頭痛薬",60000]],total:150000,sealText:"ギ",approver:"ギ",
+   note:"もう無理だガネ…早く終わってくれガネ…",errors:[],errorFields:[]}
+ ]}
+};
+/* END DATA */
+
+/* =========================================================
+   定数
+========================================================= */
+const SCORE = { correct:100, flagBonus:50, flagMiss:-25, miss:-150, falseReject:-100 };
+const DAY_TIME = 120;
+const MAX_DAY = 7;
+const SAVE_KEY = "cgkeiri_save_v3";
+const SHARE_URL = "";          // リリース時に GitHub PagesのURL+「?from=share」
+const SHARE_TAG = "#クロスギルド経理部";
+
+const FINAL_RANKS = [
+  [7000,"幹部候補","…悪くない。顔と名前は覚えておいてやる。"],
+  [5000,"優良職員","フン…並以上ではあるな。続けろ。"],
+  [2500,"平職員","給料分の仕事はしたようだな。"],
+  [0,"違約金奴隷","損失分は給料から引いておく。文句はないな?"],
+  [-Infinity,"海に投げられた","…ダズ。こいつを海に。"]
+];
+
+/* =========================================================
+   状態
+========================================================= */
+let state = { day:1, idx:0, score:0, results:[], flagged:new Set(), locked:false,
+              timeLeft:DAY_TIME, timerId:null, dayEnded:false, combo:0, maxCombo:0 };
+let slips = [];      // 当日の伝票
+let lastReport = null;
+
+const $ = id => document.getElementById(id);
+const yen = n => n.toLocaleString("ja-JP") + " B";
+
+/* =========================================================
+   保存(v2: 日次成績を蓄積)
+========================================================= */
+function loadSave(){
+  try{ return JSON.parse(localStorage.getItem(SAVE_KEY)) || {clearedDays:{}}; }
+  catch(e){ return {clearedDays:{}}; }
+}
+function saveDayResult(r){
+  const sv = loadSave();
+  sv.clearedDays[r.day] = { score:r.score, rank:r.rank, rate:r.rate, salary:r.salary };
+  sv.updatedAt = Date.now();
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(sv)); }catch(e){}
+}
+function nextDay(){
+  const sv = loadSave();
+  for(let d=1; d<=MAX_DAY; d++){ if(!sv.clearedDays[d]) return d; }
+  return MAX_DAY; // 全クリア後はDay7を再挑戦可
+}
+function totalScore(){
+  const sv = loadSave();
+  return Object.values(sv.clearedDays).reduce((a,r)=>a+r.score,0);
+}
+
+/* =========================================================
+   タイマー
+========================================================= */
+function startTimer(){
+  updateTimeHud();
+  state.timerId = setInterval(()=>{
+    state.timeLeft--;
+    updateTimeHud();
+    if(state.timeLeft <= 0) timeUp();
+  }, 1000);
+}
+function updateTimeHud(){
+  const t = Math.max(0, state.timeLeft);
+  const el = $("hudTime");
+  el.textContent = Math.floor(t/60) + ":" + String(t%60).padStart(2,"0");
+  el.classList.toggle("warn", t <= 30);
+}
+function timeUp(){
+  clearInterval(state.timerId);
+  state.dayEnded = true; state.locked = true;
+  $("btnApprove").disabled = true; $("btnReject").disabled = true;
+  $("violationOverlay").classList.add("hidden");
+  showDialog([["経理部長 ギャルディーノ","終業の鐘ガネ!! 手を止めるガネ!! 残りの伝票は明日に回すガネ。"]], showReport);
+}
+
+/* =========================================================
+   会話
+========================================================= */
+let dlgQueue = [], dlgDone = null;
+function showDialog(lines, onDone){
+  dlgQueue = lines.slice(); dlgDone = onDone;
+  $("dialogOverlay").classList.remove("hidden");
+  nextDialog();
+}
+function nextDialog(){
+  if(dlgQueue.length === 0){
+    $("dialogOverlay").classList.add("hidden");
+    if(dlgDone) dlgDone();
+    return;
+  }
+  const [sp, tx] = dlgQueue.shift();
+  $("dlgSpeaker").textContent = sp;
+  $("dlgText").textContent = tx;
+}
+$("btnDlgNext").addEventListener("click", nextDialog);
+
+/* =========================================================
+   規定書
+========================================================= */
+function openRules(){
+  const day = DAYS[state.day];
+  $("rulesToday").textContent = "本日: " + day.date;
+  let html = RULES.slice(0, day.ruleCount).map(r=>"<li>"+r+"</li>").join("");
+  $("rulesList").innerHTML = html;
+  const tbl = $("approverTable");
+  if(day.ruleCount >= 4){
+    tbl.innerHTML = "<div style='font-size:12px;color:var(--ink-faint);margin:8px 0 4px;'>― 承認者一覧 ―</div>" +
+      APPROVERS.map(a=>"<div style='font-size:12px;line-height:1.8;'><b>"+a[1]+"</b> … "+a[0]+"</div>").join("");
+    tbl.classList.remove("hidden");
+  } else { tbl.classList.add("hidden"); }
+  $("rulesOverlay").classList.remove("hidden");
+}
+$("btnRules").addEventListener("click", openRules);
+$("btnRulesClose").addEventListener("click", ()=> $("rulesOverlay").classList.add("hidden"));
+
+/* =========================================================
+   伝票描画
+========================================================= */
+function renderSlip(slip){
+  state.flagged = new Set(); state.locked = false;
+  $("hudCount").textContent = (state.idx+1) + "/" + slips.length;
+
+  const fields = [];
+  fields.push(fieldRow("date","申請日", slip.date));
+  fields.push(fieldRow("applicant","申請者", slip.applicant));
+  fields.push(fieldRow("dept","所属", slip.dept));
+  const breakdown = slip.items.map((it,i)=>fieldRow("item"+i, it[0], yen(it[1]))).join("");
+  fields.push('<div class="breakdown">'+breakdown+'</div>');
+  fields.push(fieldRow("total","請求額合計", yen(slip.total), "total-row"));
+  fields.push(
+    '<div class="field seal-row" data-f="seal"><span class="k">印影</span>' +
+    '<span class="v"><span class="seal'+(slip.sealRot?' rot':'')+'">'+slip.sealText+'</span></span></div>');
+  if(slip.hasOwnProperty("approver")){
+    fields.push(
+      '<div class="field seal-row" data-f="approve"><span class="k">承認印</span>' +
+      '<span class="v">' + (slip.approver
+        ? '<span class="seal sq">'+slip.approver+'</span>'
+        : '<span class="no-seal">(承認印なし)</span>') + '</span></div>');
+  }
+  fields.push(
+    '<div class="field note-row" data-f="note"><span class="k">備考</span>' +
+    '<span class="v">'+slip.note+'</span></div>');
+
+  $("deskArea").innerHTML =
+    '<div class="slip" id="slip">' +
+      '<div class="slip-header"><h2>'+slip.type+'</h2>' +
+      '<span class="slip-no">No. '+slip.no+'</span></div>' +
+      fields.join("") +
+      '<div class="stamp-mark" id="stampMark"></div>' +
+    '</div>';
+
+  document.querySelectorAll("#slip .field").forEach(el=>{
+    el.addEventListener("click", ()=>toggleFlag(el));
+  });
+  $("btnApprove").disabled = false;
+  $("btnReject").disabled = false;
+}
+function fieldRow(key,label,value,extra){
+  return '<div class="field '+(extra||"")+'" data-f="'+key+'">' +
+    '<span class="k">'+label+'</span><span class="v">'+value+'</span></div>';
+}
+function toggleFlag(el){
+  if(state.locked) return;
+  const f = el.dataset.f;
+  if(state.flagged.has(f)){ state.flagged.delete(f); el.classList.remove("flagged"); }
+  else{ state.flagged.add(f); el.classList.add("flagged"); }
+}
+
+/* =========================================================
+   判定
+========================================================= */
+const MISS_TEXT = {
+  calc: s=>"伝票 No."+s.no+" — 内訳合計と請求額の不一致を見逃したガネ!!\n組織の金庫から "+yen(slipDiff(s))+" が余分に流出したガネ。'あの方'に知れたらどうするガネ…!!",
+  seal: s=>"伝票 No."+s.no+" — 印影の不正を見逃したガネ!!\n偽造印かもしれないガネ…海軍の工作だったらどうするガネ!!",
+  date: s=>"伝票 No."+s.no+" — 日付が無効な伝票を通したガネ!!\n本日から25日前までが有効ガネ。期限切れ・未来・年号違いを確認するガネ!!",
+  approve: s=>"伝票 No."+s.no+" — 承認印の不備を見逃したガネ!!\n規定の承認者の印がない伝票は通せないガネ!! 承認者一覧を確認するガネ!!"
+};
+function judge(action){
+  if(state.locked || state.dayEnded) return;
+  state.locked = true;
+  $("btnApprove").disabled = true; $("btnReject").disabled = true;
+
+  const slip = slips[state.idx];
+  const hasError = slip.errors.length > 0;
+  let delta = 0, kind = "", violation = null;
+  const mk = $("stampMark");
+
+  // 押印の手応え(画面が一瞬沈む)
+  const app = $("app");
+  app.classList.remove("thud"); void app.offsetWidth; app.classList.add("thud");
+
+  if(action === "approve"){
+    mk.textContent = "承認"; mk.className = "stamp-mark approve show";
+    // 承認に貼られた付箋はすべて「誤指摘」(不備なしと判断したはずなので)
+    let wrong = state.flagged.size;
+    if(!hasError){ delta = SCORE.correct + wrong*SCORE.flagMiss; kind = "good"; }
+    else{
+      delta = SCORE.miss + wrong*SCORE.flagMiss; kind = "bad";
+      violation = MISS_TEXT[slip.errors[0]](slip);
+    }
+  }else{
+    mk.textContent = "差戻"; mk.className = "stamp-mark reject show";
+    if(hasError){
+      kind = "good";
+      let hits = 0, wrong = 0;
+      state.flagged.forEach(f=>{
+        if(slip.errorFields.indexOf(f) !== -1) hits++; else wrong++;
+      });
+      delta = SCORE.correct + hits*SCORE.flagBonus + wrong*SCORE.flagMiss;
+      slip._hits = hits;
+    }else{
+      delta = SCORE.falseReject; kind = "bad";
+      violation = "伝票 No."+slip.no+" は正規の伝票だガネ。\n申請者から抗議が届いたガネ。業務を遅延させるんじゃないガネ!!";
+    }
+  }
+
+  // コンボ管理
+  if(kind === "good"){ state.combo++; if(state.combo > state.maxCombo) state.maxCombo = state.combo; }
+  else { state.combo = 0; }
+
+  state.score += delta;
+  state.results.push({no:slip.no, delta:delta, ok:kind==="good"});
+
+  const flash = $("resultFlash");
+  flash.textContent = (delta>=0?"+":"") + delta;
+  slip._hits = 0;
+  flash.className = (delta >= 0 ? "good" : "bad") + " show";
+  if(navigator.vibrate) navigator.vibrate(kind==="good"?20:[40,40,40]);
+
+  // 紙の排出
+  const slipEl = $("slip");
+  if(slipEl){ slipEl.classList.add(action==="approve" ? "eject-approve" : "eject-reject"); }
+
+  // 見逃し(miss)が出たらダズが現れる演出を挟む
+  setTimeout(()=>{
+    flash.className = "";
+    if(state.dayEnded) return;
+    if(violation){
+      $("violationText").textContent = violation;
+      $("violationOverlay").classList.remove("hidden");
+    }else{ advance(); }
+  }, 1100);
+}
+/* ダズ登場(無言の圧) */
+function showDaz(line, onDone){
+  $("dazLine").textContent = line;
+  const el = $("dazAlert");
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  if(navigator.vibrate) navigator.vibrate([60,30,60]);
+  setTimeout(onDone, 2200);
+}
+function slipDiff(slip){
+  const real = slip.items.reduce((a,it)=>a+it[1],0);
+  return Math.abs(slip.total - real);
+}
+
+/* 海円暦=現実暦準拠。日付の有効性を判定(本日から0〜25日前のみ有効) */
+const MONTH_DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+function parseEraDate(str){
+  const m = str.match(/海円暦(\d+)年\s*(\d+)月\s*(\d+)日/);
+  return m ? {y:+m[1], mo:+m[2], d:+m[3]} : null;
+}
+function absDays(y,mo,d){
+  let days = y*365;
+  for(let m=1; m<mo; m++) days += MONTH_DAYS[m-1];
+  return days + d;
+}
+function isDateValid(slipDateStr, todayStr){
+  const s = parseEraDate(slipDateStr), t = parseEraDate(todayStr);
+  if(!s || !t) return true;
+  if(s.mo < 1 || s.mo > 12) return false;            // 実在しない月
+  if(s.d < 1 || s.d > MONTH_DAYS[s.mo-1]) return false; // 実在しない日
+  const diff = absDays(t.y,t.mo,t.d) - absDays(s.y,s.mo,s.d);
+  if(diff < 0) return false;   // 未来
+  if(diff > 25) return false;  // 25日より古い(期限切れ)
+  return true;
+}
+$("btnViolationClose").addEventListener("click", ()=>{
+  $("violationOverlay").classList.add("hidden");
+  advance();
+});
+$("btnApprove").addEventListener("click", ()=>judge("approve"));
+$("btnReject").addEventListener("click", ()=>judge("reject"));
+
+/* =========================================================
+   進行
+========================================================= */
+function advance(){
+  if(state.dayEnded) return;
+  state.idx++;
+  if(state.idx >= slips.length){
+    clearInterval(state.timerId);
+    state.dayEnded = true;
+    showReport();
+  }
+  else{ renderSlip(slips[state.idx]); }
+}
+function showReport(){
+  const done = state.results.length;
+  const correct = state.results.filter(r=>r.ok).length;
+  const rate = done ? Math.round(correct / done * 100) : 0;
+  const remain = slips.length - done;
+  const salary = 5000 + Math.max(0, state.score) * 10;
+  // 評価点が100点以下なら不可(解雇)。それ以外は正答率で判定
+  const fired = state.score <= 100;
+  let rank = "不可";
+  if(fired) rank = "不可";
+  else if(done === slips.length && rate === 100) rank = "優";
+  else if(rate >= 80) rank = "良";
+  else if(rate >= 50) rank = "可";
+
+  $("reportTitle").textContent = fired ? "解 雇 通 告 — DAY " + state.day : "業務日報 — DAY " + state.day;
+  $("reportBody").innerHTML =
+    rline("検査枚数", done + " / " + slips.length + " 枚") +
+    (remain > 0 ? rline("未処理", remain + " 枚") : "") +
+    rline("正答", correct + " 枚 ("+rate+"%)") +
+    (state.maxCombo >= 3 ? rline("最大連続正答", state.maxCombo + " 連") : "") +
+    rline("評価点", state.score) +
+    (fired ? rline("本日の給料", "支給なし(損失補填)", "total")
+           : rline("本日の給料", yen(salary), "total"));
+  $("rankSeal").textContent = rank;
+  lastReport = { day: state.day, done: done, totalSlips: slips.length,
+                 rate: rate, score: state.score, salary: salary, rank: rank, fired: fired };
+  // 不可(解雇)の日はクリア扱いにせず、セーブしない
+  if(!state.editMode && !fired) saveDayResult(lastReport);
+  track("kanri_day_complete", { day: state.day, rank: rank, rate: rate, score: state.score, fired: fired, edit: !!state.editMode });
+  // 退勤ボタンの文言を切り替え
+  $("btnReportClose").textContent = fired ? "解雇 — この日をやり直す" : "退勤する(保存)";
+  $("reportOverlay").classList.remove("hidden");
+}
+function rline(k,v,extra){
+  return '<div class="report-line '+(extra||"")+'"><span>'+k+'</span><span>'+v+'</span></div>';
+}
+$("btnReportClose").addEventListener("click", ()=>{
+  $("reportOverlay").classList.add("hidden");
+  if(lastReport && lastReport.fired){
+    // 解雇: 同じDayを最初からやり直し(Editモード状態は維持)
+    startDay(state.day, state.editMode);
+  }
+  else if(state.editMode){ location.reload(); }
+  else if(state.day >= MAX_DAY){ showFinal(); }
+  else{ location.reload(); }
+});
+
+/* =========================================================
+   最終査定(Day7後)
+========================================================= */
+function showFinal(){
+  const total = totalScore();
+  const sv = loadSave();
+  const salarySum = Object.values(sv.clearedDays).reduce((a,r)=>a+r.salary,0);
+  const entry = FINAL_RANKS.find(e=>total >= e[0]);
+  $("finalBody").innerHTML =
+    rline("勤務日数", Object.keys(sv.clearedDays).length + " 日") +
+    rline("通算評価点", total) +
+    rline("支給総額", yen(salarySum), "total");
+  $("finalRank").textContent = entry[1];
+  $("finalWord").textContent = entry[2];
+  track("kanri_game_complete", { total: total, final_rank: entry[1] });
+
+  // ランクに応じた監査の前口上 → 査定表示
+  const lead = [
+    ["クロコダイル","クハハハ…一週間、ご苦労だったな。帳簿は嘘をつかん。お前の働きはすべてここに記録されている。"]
+  ];
+  const isWorst = entry[1] === "海に投げられた";
+  showDialog(lead, ()=>{
+    $("finalOverlay").classList.remove("hidden");
+    if(isWorst){
+      // ワースト: 査定を見せた後、ダズが現れて連行する含み
+      setTimeout(()=>{
+        showDaz("……。", ()=>{});
+      }, 1400);
+    }
+  });
+}
+$("btnFinalClose").addEventListener("click", ()=> location.reload());
+
+/* =========================================================
+   人事考課票(canvas) + シェア
+========================================================= */
+function drawKokaCard(r){
+  const cv = $("kokaCanvas"), ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const SERIF = '"Hiragino Mincho ProN","Yu Mincho",serif';
+  const g = ctx.createRadialGradient(W/2,-100,100, W/2,H/2,H);
+  g.addColorStop(0,"#3a241a"); g.addColorStop(.6,"#241510");
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = "#c9a24b"; ctx.lineWidth = 6;
+  ctx.strokeRect(40,40,W-80,H-80);
+  ctx.lineWidth = 2; ctx.strokeRect(56,56,W-112,H-112);
+  ctx.textAlign = "center"; ctx.fillStyle = "#8a7034";
+  ctx.font = "38px " + SERIF;
+  ctx.fillText("C R O S S   G U I L D", W/2, 160);
+  ctx.fillStyle = "#f2e8d2";
+  ctx.font = "bold 92px " + SERIF;
+  ctx.fillText("人 事 考 課 票", W/2, 280);
+  ctx.strokeStyle = "#c9a24b"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(140,330); ctx.lineTo(W-140,330); ctx.stroke();
+  const rows = [
+    ["勤務日", "DAY " + r.day],
+    ["検査枚数", r.done + " / " + r.totalSlips + " 枚"],
+    ["正答率", r.rate + " %"],
+    ["評価点", String(r.score)],
+    ["支給額", r.salary.toLocaleString("ja-JP") + " ベリー"]
+  ];
+  let y = 450;
+  rows.forEach(([k,v])=>{
+    ctx.textAlign = "left"; ctx.fillStyle = "#8a7034";
+    ctx.font = "40px " + SERIF; ctx.fillText(k, 160, y);
+    ctx.textAlign = "right"; ctx.fillStyle = "#f2e8d2";
+    ctx.font = "bold 48px " + SERIF; ctx.fillText(v, W-160, y);
+    ctx.strokeStyle = "rgba(201,162,75,.25)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(150,y+26); ctx.lineTo(W-150,y+26); ctx.stroke();
+    y += 110;
+  });
+  ctx.save();
+  ctx.translate(W/2, y+170); ctx.rotate(-8*Math.PI/180);
+  ctx.strokeStyle = "#c0392b"; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.arc(0,0,130,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle = "#c0392b"; ctx.textAlign = "center";
+  ctx.font = "bold 130px " + SERIF;
+  ctx.fillText(r.rank, 0, 48);
+  ctx.restore();
+  ctx.textAlign = "center"; ctx.fillStyle = "#8a7034";
+  ctx.font = "32px " + SERIF;
+  ctx.fillText("査定者 — 経理部長 ギャルディーノ", W/2, H-150);
+  ctx.fillStyle = "rgba(242,232,210,.35)";
+  ctx.font = "26px " + SERIF;
+  ctx.fillText("PROTOTYPE BUILD", W/2, H-95);
+}
+$("btnIssueCard").addEventListener("click", ()=>{
+  if(!lastReport) return;
+  drawKokaCard(lastReport);
+  $("cardOverlay").classList.remove("hidden");
+  track("kanri_card_issue", { day: lastReport.day, rank: lastReport.rank });
+});
+$("btnCardClose").addEventListener("click", ()=> $("cardOverlay").classList.add("hidden"));
+function canvasBlob(){
+  return new Promise(res => $("kokaCanvas").toBlob(res, "image/png"));
+}
+$("btnShareCard").addEventListener("click", async ()=>{
+  const blob = await canvasBlob();
+  const file = new File([blob], "cg_koka_day"+lastReport.day+".png", {type:"image/png"});
+  const text = "CROSS GUILD 経理部 DAY"+lastReport.day+" 査定「"+lastReport.rank+"」 "
+             + SHARE_TAG + (SHARE_URL ? "\n"+SHARE_URL : "");
+  track("kanri_share", { day: lastReport.day, rank: lastReport.rank });
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({ files:[file], text:text }); }catch(e){}
+  }else{ downloadCanvas(); }
+});
+$("btnSaveCard").addEventListener("click", downloadCanvas);
+async function downloadCanvas(){
+  const blob = await canvasBlob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "cg_koka_day"+lastReport.day+".png";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* =========================================================
+   起動
+========================================================= */
+function startDay(day, editMode){
+  $("titleScreen").classList.add("hidden");
+  state = { day:day, idx:0, score:0, results:[], flagged:new Set(), locked:false,
+            timeLeft:DAY_TIME, timerId:null, dayEnded:false, combo:0, maxCombo:0, editMode:!!editMode };
+  slips = DAYS[day].slips;
+  // 日付エラーは実関数を単一基準にして自動補正(Day3以降のみ有効ルール)
+  if(day >= 3){
+    const today = DAYS[day].date;
+    slips.forEach(s=>{
+      const bad = !isDateValid(s.date, today);
+      const has = s.errors.indexOf("date") !== -1;
+      if(bad && !has){ s.errors.push("date"); s.errorFields.push("date"); }
+      if(!bad && has){
+        s.errors = s.errors.filter(e=>e!=="date");
+        s.errorFields = s.errorFields.filter(f=>f!=="date");
+      }
+    });
+  }
+  $("hudDay").textContent = day;
+  $("hudToday").textContent = DAYS[day].date.replace(/\s+/g, "");
+  updateTimeHud();
+  showDialog(DAYS[day].intro, ()=>{
+    renderSlip(slips[0]);
+    startTimer();
+  });
+}
+$("btnStart").addEventListener("click", ()=> startDay(nextDay()));
+$("btnReset").addEventListener("click", ()=>{
+  if(confirm("勤務記録をすべて破棄するガネ? よろしいガネ?")){
+    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    location.reload();
+  }
+});
+
+/* ===== Editモード ===== */
+const EDIT_PW = "1234";
+$("btnEdit").addEventListener("click", ()=>{
+  $("editPwBlock").classList.remove("hidden");
+  $("editDayBlock").classList.add("hidden");
+  $("editPw").value = "";
+  $("editPwErr").textContent = "";
+  $("editOverlay").classList.remove("hidden");
+  $("editPw").focus();
+});
+$("btnEditClose").addEventListener("click", ()=> $("editOverlay").classList.add("hidden"));
+function editAuth(){
+  if($("editPw").value === EDIT_PW){
+    $("editPwBlock").classList.add("hidden");
+    $("editDayBlock").classList.remove("hidden");
+    const grid = $("editDayGrid");
+    grid.innerHTML = "";
+    for(let d=1; d<=MAX_DAY; d++){
+      const b = document.createElement("button");
+      b.textContent = "DAY " + d;
+      b.addEventListener("click", ()=>{
+        $("editOverlay").classList.add("hidden");
+        track("kanri_edit_start", { day: d });
+        startDay(d, true);
+      });
+      grid.appendChild(b);
+    }
+  }else{
+    $("editPwErr").textContent = "パスワードが違うガネ。";
+    $("editPw").value = "";
+  }
+}
+$("btnEditAuth").addEventListener("click", editAuth);
+$("editPw").addEventListener("keydown", e=>{ if(e.key === "Enter") editAuth(); });
+
+(function init(){
+  const sv = loadSave();
+  const cleared = Object.keys(sv.clearedDays).length;
+  if(cleared > 0){
+    $("btnStart").textContent = "出勤する(DAY " + nextDay() + ")";
+    $("btnReset").classList.remove("hidden");
+    track("kanri_return_visit", { cleared_days: cleared });
+  }
+  if(location.search.indexOf("from=share") !== -1){
+    track("kanri_visit_from_share", {});
+  }
+})();
+</script>
+</body>
+</html>
